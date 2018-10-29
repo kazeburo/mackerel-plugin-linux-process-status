@@ -93,7 +93,7 @@ func getStats(opts cmdOpts) error {
 
 	tmpDir := os.TempDir()
 	curUser, _ := user.Current()
-	prevPath := filepath.Join(tmpDir, fmt.Sprintf("%s-process-status-%d", curUser.Uid, opts.Pid))
+	prevPath := filepath.Join(tmpDir, fmt.Sprintf("%s-process-status-%s-%d", curUser.Uid, opts.KeyPrefix, opts.Pid))
 
 	if !fileExists(prevPath) {
 		err = writeStats(prevPath, ps)
@@ -111,10 +111,8 @@ func getStats(opts cmdOpts) error {
 
 	user := int64(ps.Utime-prev.Utime) + (ps.Cutime - prev.Cutime)
 	system := int64(ps.Stime-prev.Stime) + (ps.Cstime - prev.Cstime)
-	up := (float64(user) / float64(ps.CPU-prev.CPU)) * 100
-	sp := (float64(system) / float64(ps.CPU-prev.CPU)) * 100
-	fmt.Printf("process-status.cpu_%s.user\t%f\t%d\n", opts.KeyPrefix, up, now)
-	fmt.Printf("process-status.cpu_%s.system\t%f\t%d\n", opts.KeyPrefix, sp, now)
+	us := (float64(user+system) / float64(ps.CPU-prev.CPU)) * 100
+	fmt.Printf("process-status.cpu_%s.percentage\t%f\t%d\n", opts.KeyPrefix, us, now)
 	err = writeStats(prevPath, ps)
 	if err != nil {
 		return fmt.Errorf("failed to save stats: %v", err)
