@@ -10,26 +10,24 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/c9s/goprocinfo/linux"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/pkg/errors"
+	"github.com/prometheus/procfs"
 )
 
 // Version by Makefile
 var Version string
 
 type cmdOpts struct {
-	Pid       uint64 `short:"p" long:"pid" description:"PID" required:"true"`
+	Pid       int    `short:"p" long:"pid" description:"PID" required:"true"`
 	KeyPrefix string `long:"key-prefix" description:"Metric key prefix" required:"true"`
 	Version   bool   `short:"v" long:"version" description:"Show version"`
 }
 
 type processStats struct {
-	Now    uint64 `json:"now"`
-	CPU    uint64 `json:"cpu"`
-	Utime  uint64 `json:"utime"`
-	Stime  uint64 `json:"stime"`
-	Cutime int64  `json:"cutime"`
-	Cstime int64  `json:"cstime"`
+	Now    uint64  `json:"now"`
+	SysCPU float64 `json:"syscpu"`
+	CPU    float64 `json:"cpu"`
 }
 
 func fileExists(filename string) bool {
@@ -64,41 +62,58 @@ func readStats(filename string) (processStats, error) {
 	return ps, nil
 }
 
-func cpuJiffer() uint64 {
-
-	cpu, _ := linux.ReadStat("/proc/stat")
-
-	// cpu's jiffies
-	e := cpu.CPUStatAll
-	return e.User + e.Nice + e.System + e.Idle
+func cpuJiffer() (float64, error) {
+	// read /proc/stat
+	cpu, err := procfs.NewStat()
+	if err != nil {
+		return 0, err
+	}
+	return (cpu.CPUTotal.User + cpu.CPUTotal.Nice + cpu.CPUTotal.System + cpu.CPUTotal.Idle), nil
 }
 
-func getStats(opts cmdOpts) error {
-
-	c := cpuJiffer()
-	now := uint64(time.Now().Unix())
-	p, err := linux.ReadProcess(opts.Pid, "/proc")
+func getFdsStat(p procfs.Proc, key string, now uint64) error {
+	fds, err := p.FileDescriptorsLen()
 	if err != nil {
-		return fmt.Errorf("failed to fetch stats: %v", err)
+		return errors.Wrap(err, "Could not get fds")
+	}
+
+	limit, err := p.NewLimits()
+	if err != nil {
+		return errors.Wrap(err, "Could not get limits")
+	}
+
+	fmt.Printf("process-status.fds_%s.count\t%d\t%d\n", key, fds, now)
+	fmt.Printf("process-status.fds_%s.max\t%d\t%d\n", key, limit.OpenFiles, now)
+	fmt.Printf("process-status.fds_usage_%s.percentage\t%f\t%d\n", key, float64(fds)*100/float64(limit.OpenFiles), now)
+
+	return nil
+}
+
+func getCPUStat(p procfs.Proc, key string, now uint64) error {
+	pss, err := p.NewStat()
+	if err != nil {
+		return errors.Wrap(err, "Could not get process stat")
+	}
+
+	c, err := cpuJiffer()
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch /proc/stat")
 	}
 
 	ps := processStats{
 		Now:    now,
-		CPU:    c,
-		Utime:  p.Stat.Utime,
-		Cutime: p.Stat.Cutime,
-		Stime:  p.Stat.Stime,
-		Cstime: p.Stat.Cstime,
+		SysCPU: c,
+		CPU:    pss.CPUTime(),
 	}
 
 	tmpDir := os.TempDir()
 	curUser, _ := user.Current()
-	prevPath := filepath.Join(tmpDir, fmt.Sprintf("%s-process-status-%s-%d", curUser.Uid, opts.KeyPrefix, opts.Pid))
+	prevPath := filepath.Join(tmpDir, fmt.Sprintf("%s-process-status-v2-%s-%d", curUser.Uid, key, p.PID))
 
 	if !fileExists(prevPath) {
 		err = writeStats(prevPath, ps)
 		if err != nil {
-			return fmt.Errorf("failed to save stats: %v", err)
+			return errors.Wrap(err, "failed to save stats")
 		}
 		fmt.Fprintf(os.Stderr, "Notice: first time execution command\n")
 		return nil
@@ -106,17 +121,38 @@ func getStats(opts cmdOpts) error {
 
 	prev, err := readStats(prevPath)
 	if err != nil {
-		return fmt.Errorf("failed to load stats: %v", err)
+		return errors.Wrap(err, "failed to load stats")
 	}
 
-	user := int64(ps.Utime-prev.Utime) + (ps.Cutime - prev.Cutime)
-	system := int64(ps.Stime-prev.Stime) + (ps.Cstime - prev.Cstime)
-	us := (float64(user+system) / float64(ps.CPU-prev.CPU)) * 100
-	fmt.Printf("process-status.cpu_%s.percentage\t%f\t%d\n", opts.KeyPrefix, us, now)
+	us := (float64(ps.CPU-prev.CPU) / float64(ps.SysCPU-prev.SysCPU)) * 100
+	fmt.Printf("process-status.cpu_%s.percentage\t%f\t%d\n", key, us, now)
 	err = writeStats(prevPath, ps)
 	if err != nil {
-		return fmt.Errorf("failed to save stats: %v", err)
+		return errors.Wrap(err, "failed to save stats")
 	}
+
+	return nil
+}
+
+func getStats(opts cmdOpts) error {
+
+	now := uint64(time.Now().Unix())
+
+	p, err := procfs.NewProc(opts.Pid)
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch proc")
+	}
+
+	err = getFdsStat(p, opts.KeyPrefix, now)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Notice: %v\n", err)
+	}
+
+	err = getCPUStat(p, opts.KeyPrefix, now)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
