@@ -2,14 +2,6 @@
 
 
 [[projects]]
-  branch = "master"
-  digest = "1:080689a7cb710dc8f694005f8e5b3aab861d01e885eaf53fae54431c4635bfe6"
-  name = "github.com/c9s/goprocinfo"
-  packages = ["linux"]
-  pruneopts = "UT"
-  revision = "0010a05ce49fde7f50669bc7ecda7d41dd6ab824"
-
-[[projects]]
   digest = "1:a2cff208d4759f6ba1b1cd228587b0a1869f95f22542ec9cd17fff64430113c7"
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
@@ -17,12 +9,35 @@
   revision = "c6ca198ec95c841fdb89fc0de7496fed11ab854e"
   version = "v1.4.0"
 
+[[projects]]
+  digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:ca30ee2c96d195cef49b546d10825d3e13b50c63da4df23c80e77c51e07bad0d"
+  name = "github.com/prometheus/procfs"
+  packages = [
+    ".",
+    "internal/util",
+    "iostats",
+    "nfs",
+    "xfs",
+  ]
+  pruneopts = "UT"
+  revision = "e4d4a2206da023361ed100d85c5f2cf9c8364e9f"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/c9s/goprocinfo/linux",
     "github.com/jessevdk/go-flags",
+    "github.com/pkg/errors",
+    "github.com/prometheus/procfs",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
