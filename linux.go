@@ -89,6 +89,31 @@ func getFdsStat(p procfs.Proc, key string, now uint64) error {
 	return nil
 }
 
+func getMemStat(p procfs.Proc, key string, now uint64) error {
+	pss, err := p.NewStat()
+	if err != nil {
+		return errors.Wrap(err, "Could not get NewStat")
+	}
+	used := pss.ResidentMemory()
+
+	fs, err := procfs.NewDefaultFS()
+	if err != nil {
+		return errors.Wrap(err, "Could not get NewDefaultFS")
+	}
+	ms, err := fs.Meminfo()
+	if err != nil {
+		return errors.Wrap(err, "Could not get getMemStat")
+	}
+	// XXX use MemTotal as max memory. not concern cgroup
+	max := ms.MemTotal
+	max = max * 1024
+
+	fmt.Printf("process-status.mem_%s.used\t%d\t%d\n", key, used, now)
+	fmt.Printf("process-status.mem_%s.max\t%d\t%d\n", key, max, now)
+	fmt.Printf("process-status.mem_usage_%s.percentage\t%f\t%d\n", key, float64(used)*100/float64(max), now)
+	return nil
+}
+
 func getCPUStat(p procfs.Proc, key string, now uint64) error {
 	pss, err := p.NewStat()
 	if err != nil {
@@ -149,6 +174,11 @@ func getStats(opts cmdOpts) error {
 	}
 
 	err = getCPUStat(p, opts.KeyPrefix, now)
+	if err != nil {
+		return err
+	}
+
+	err = getMemStat(p, opts.KeyPrefix, now)
 	if err != nil {
 		return err
 	}

@@ -4,12 +4,6 @@ all: mackerel-plugin-linux-process-status
 
 .PHONY: mackerel-plugin-linux-process-status
 
-bundle:
-	dep ensure
-
-update:
-	dep ensure -update
-
 mackerel-plugin-linux-process-status: linux.go
 	go build $(LDFLAGS) -o mackerel-plugin-linux-process-status
 
