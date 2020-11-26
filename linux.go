@@ -192,7 +192,7 @@ func main() {
 
 func _main() int {
 	opts := cmdOpts{}
-	psr := flags.NewParser(&opts, flags.Default)
+	psr := flags.NewParser(&opts, flags.HelpFlag|flags.PassDoubleDash)
 	_, err := psr.Parse()
 	if opts.Version {
 		fmt.Printf(`%s %s
@@ -205,6 +205,7 @@ Compiler: %s %s
 		return 0
 	}
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}
 
