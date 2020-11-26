@@ -1,5 +1,5 @@
 VERSION=0.0.4
-LDFLAGS=-ldflags "-X main.Version=${VERSION}"
+LDFLAGS=-ldflags "-X main.version=${VERSION}"
 all: mackerel-plugin-linux-process-status
 
 .PHONY: mackerel-plugin-linux-process-status
@@ -13,6 +13,9 @@ linux: linux.go
 fmt:
 	go fmt ./...
 
+check:
+	go test ./...
+
 clean:
 	rm -rf mackerel-plugin-linux-process-status
 
@@ -20,4 +23,3 @@ tag:
 	git tag v${VERSION}
 	git push origin v${VERSION}
 	git push origin master
-	goreleaser --rm-dist
