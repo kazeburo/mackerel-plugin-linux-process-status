@@ -1,5 +1,5 @@
 VERSION=0.0.7
-LDFLAGS=-ldflags "-X main.version=${VERSION}"
+LDFLAGS=-ldflags "-w -s -X main.version=${VERSION}"
 all: mackerel-plugin-linux-process-status
 
 .PHONY: mackerel-plugin-linux-process-status
